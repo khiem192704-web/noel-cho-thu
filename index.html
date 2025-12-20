@@ -470,43 +470,58 @@
             const speed = 0.06;
             const handRotY = (handX - 0.5) * 2.5;
 
-            // Vandiep
+            // Cập nhật các hạt (cây thông/pháo hoa)
             updateParticleGroup(groupGold, state, speed, handRotY, time, false);
-            updateParticleGroup(groupRed, state, speed, handRotY, time, true); // Vandiep
+            updateParticleGroup(groupRed, state, speed, handRotY, time, true);
             updateParticleGroup(groupGift, state, speed, handRotY, time, false);
 
-            // Vandiep
+            // Đảm bảo load texture cho ảnh nếu chưa có
             photoMeshes.forEach((mesh, i) => {
                 if(!mesh.material.map && photoTextures[i]) {
                     mesh.material.map = photoTextures[i]; mesh.material.needsUpdate = true;
                 }
             });
 
+            // --- XỬ LÝ CÁC TRẠNG THÁI ---
+
+            // 1. TRẠNG THÁI CÂY THÔNG (Nắm tay)
             if (state === 'TREE') {
                 titleMesh.visible = true; starMesh.visible = true;
                 titleMesh.scale.lerp(new THREE.Vector3(1,1,1), 0.1);
                 starMesh.rotation.z -= 0.02;
+                // Thu nhỏ ảnh và giấu đi
                 photoMeshes.forEach(m => { m.scale.lerp(new THREE.Vector3(0,0,0), 0.1); m.visible = false; });
 
+            // 2. TRẠNG THÁI BUNG QUÀ (Xòe tay) -> XOAY VÒNG
             } else if (state === 'EXPLODE') {
                 titleMesh.visible = false; starMesh.visible = false;
                 
-                const baseAngle = groupGold.rotation.y; 
+                // Tốc độ xoay vòng (chỉnh số 0.5 để nhanh/chậm)
+                const rotationSpeed = 0.5; 
+                const baseAngle = time * rotationSpeed; 
+                
                 const angleStep = (Math.PI * 2) / 5;
                 let bestIdx = 0; let maxZ = -999;
 
                 photoMeshes.forEach((mesh, i) => {
                     mesh.visible = true;
+                    // Tính vị trí xoay vòng
                     const angle = baseAngle + i * angleStep;
                     const x = Math.sin(angle) * CONFIG.photoOrbitRadius;
                     const z = Math.cos(angle) * CONFIG.photoOrbitRadius;
-                    const y = Math.sin(time + i) * 3; 
+                    const y = Math.sin(time * 2 + i) * 3; // Nhấp nhô nhẹ
 
+                    // Di chuyển ảnh theo vòng tròn
                     mesh.position.lerp(new THREE.Vector3(x, y, z), 0.1);
-                    mesh.lookAt(camera.position);
+                    mesh.lookAt(camera.position); // Luôn nhìn về camera
 
-                    if (z > maxZ) { maxZ = z; bestIdx = i; }
+                    // Tìm xem ảnh nào đang ở gần mắt nhất (z lớn nhất)
+                    if (z > maxZ) { 
+                        maxZ = z; 
+                        bestIdx = i; 
+                    }
                     
+                    // Hiệu ứng: Ảnh ở xa thì nhỏ, ở gần thì to hơn chút
                     if (z > 5) { 
                         const distScale = 1.0 + (z / CONFIG.photoOrbitRadius) * 0.8; 
                         mesh.scale.lerp(new THREE.Vector3(distScale, distScale, distScale), 0.1);
@@ -514,16 +529,22 @@
                         mesh.scale.lerp(new THREE.Vector3(0.6, 0.6, 0.6), 0.1);
                     }
                 });
+                
+                // Ghi nhớ ảnh tốt nhất để chuẩn bị cho trạng thái OK
                 selectedIndex = bestIdx;
 
+            // 3. TRẠNG THÁI OK (Pinch tay) -> DỪNG VÀ PHÓNG TO
             } else if (state === 'PHOTO') {
+                // Lúc này không tính toán xoay vòng nữa (ảnh sẽ đứng lại)
                 photoMeshes.forEach((mesh, i) => {
                     if (i === selectedIndex) {
+                        // Ảnh được chọn: Bay ra giữa (z=60) và phóng to (scale=5)
                         mesh.position.lerp(new THREE.Vector3(0, 0, 60), 0.1);
                         mesh.scale.lerp(new THREE.Vector3(5, 5, 5), 0.1);
                         mesh.lookAt(camera.position);
-                        mesh.rotation.z = 0;
+                        mesh.rotation.z = 0; // Cân chỉnh lại cho thẳng
                     } else {
+                        // Các ảnh khác: Thu nhỏ về 0
                         mesh.scale.lerp(new THREE.Vector3(0,0,0), 0.1);
                     }
                 });
@@ -600,6 +621,7 @@
     </script>
 </body>
 </html>
+
 
 
 
